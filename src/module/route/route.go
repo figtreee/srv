@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"srv/src/module/hero"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -14,7 +15,12 @@ import (
 
 var db *sqlx.DB
 
-type shuju struct {
+type heroInfo struct {
+	HeroId   int    `json:"id" db:"id"`
+	HeroName string `json:"name" db:"name"`
+}
+
+type userInfo struct {
 	UserName string `json:"userName"`
 	UserPwd  string `json:"userPwd"`
 }
@@ -39,6 +45,19 @@ func initMySQL(databaseName string) (err error) {
 	return err
 }
 
+func createHeroTable() {
+	schema := `CREATE TABLE  if not exists hero (
+	id int AUTO_INCREMENT primary key NOT NULL ,
+  name varchar(50) unique NOT NULL)
+	;`
+	// 调用Exec函数执行sql语句，创建表
+	_, err := db.Exec(schema)
+	//错误处理
+	if err != nil {
+		panic(err)
+	}
+}
+
 func createUserTable() {
 	schema := `CREATE TABLE  if not exists user (
 	id int AUTO_INCREMENT primary key NOT NULL ,
@@ -53,7 +72,19 @@ func createUserTable() {
 	}
 }
 
-func insertUser(userName string, userPwd string) (res int) {
+func insertHero(heroName string) int {
+
+	judgeNameSql := `SELECT COUNT(*) FROM hero WHERE name=?`
+	var total int
+	db.Get(&total, judgeNameSql, heroName)
+	if total == 1 {
+		return 0
+	}
+	insertSql := `INSERT INTO hero (name) VALUES(?)`
+	db.MustExec(insertSql, heroName)
+	return 9
+}
+func insertUser(userName string, userPwd string) int {
 
 	judgeNameSql := `SELECT COUNT(*) FROM user WHERE name=?`
 	var total int
@@ -63,6 +94,47 @@ func insertUser(userName string, userPwd string) (res int) {
 	}
 	insertSql := `INSERT INTO user (name,password) VALUES(?,?)`
 	db.MustExec(insertSql, userName, userPwd)
+	return 9
+}
+func getHeroAll() []heroInfo {
+	var res []heroInfo
+	getHeroSql := `SELECT * FROM hero`
+	if err := db.Select(&res, getHeroSql); err != nil {
+		var errHero []heroInfo
+		return errHero
+	}
+	return res
+}
+func getHero(heroID int) heroInfo {
+	var res heroInfo
+	getHeroSql := `SELECT id,name FROM hero WHERE id=? `
+	if err := db.Get(&res, getHeroSql, 1); err != nil {
+		var errHero heroInfo
+		return errHero
+	}
+
+	return res
+}
+
+func updateHero(heroId int, heroName string) int {
+	updateHeroSql := `UPDATE hero SET name=? WHERE id =?`
+	ret, err := db.Exec(updateHeroSql, heroName, heroId)
+	if err != nil {
+		return 0
+	}
+	n, err := ret.RowsAffected()
+	if err != nil || n == 0 {
+		return 0
+	}
+	return 9
+}
+
+func delHero(heroId int) int {
+	delHeroSql := `DELETE FROM hero WHERE id=?`
+	_, err := db.Exec(delHeroSql, heroId)
+	if err != nil {
+		return 0
+	}
 	return 9
 }
 
@@ -95,7 +167,7 @@ func Init() *gin.Engine {
 	db.SetMaxIdleConns(10)
 
 	createUserTable()
-
+	createHeroTable()
 	// Init route
 	r := gin.Default()
 
@@ -158,7 +230,7 @@ func Init() *gin.Engine {
 		})
 
 		projApiRoute.POST("/user/register", func(c *gin.Context) {
-			var userLogin shuju
+			var userLogin userInfo
 			var resStr string
 			if err := c.ShouldBindJSON(&userLogin); err != nil {
 				log.Printf("Error: %s", err.Error())
@@ -166,7 +238,7 @@ func Init() *gin.Engine {
 			}
 			if res := insertUser(userLogin.UserName, userLogin.UserPwd); res != 9 {
 				resStr = "Insert Fail"
-				return
+
 			} else {
 				resStr = "Insert seccess"
 			}
@@ -176,7 +248,75 @@ func Init() *gin.Engine {
 			})
 		})
 
-	}
+		//hero
+		projApiRoute.GET("/hero/get", func(c *gin.Context) {
 
+			strId := c.DefaultQuery("id", "-1")
+			var resHero heroInfo
+			intId, err := strconv.Atoi(strId)
+			if err == nil {
+				resHero = getHero(intId)
+			}
+
+			c.JSON(200, gin.H{
+				"Res": resHero,
+			})
+		})
+		//
+
+		//有问题
+		projApiRoute.GET("/hero/getall", func(c *gin.Context) {
+			resHero := getHeroAll()
+
+			c.JSON(200, gin.H{
+				"Res": resHero,
+			})
+		})
+
+		projApiRoute.GET("/hero/insert", func(c *gin.Context) {
+			newHeroName := c.DefaultQuery("name", "-1")
+			intRes := insertHero(newHeroName)
+			var resStr string
+			if intRes != 9 {
+				resStr = "Fail"
+			} else {
+				resStr = "Success"
+			}
+			c.JSON(200, gin.H{
+				"Res": resStr,
+			})
+		})
+
+		projApiRoute.GET("/hero/del", func(c *gin.Context) {
+			resStr := "Fail"
+			heroId := c.DefaultQuery("id", "-1")
+			intId, err := strconv.Atoi(heroId)
+			if err == nil {
+				intRes := delHero(intId)
+				if intRes == 9 {
+					resStr = "Success"
+				}
+			}
+			c.JSON(200, gin.H{
+				"Res": resStr,
+			})
+		})
+
+		projApiRoute.GET("/hero/update", func(c *gin.Context) {
+			resStr := "Fail"
+			heroId := c.DefaultQuery("id", "-1")
+			heroName := c.DefaultQuery("name", "-1")
+			intId, err := strconv.Atoi(heroId)
+			if err == nil {
+				intRes := updateHero(intId, heroName)
+				if intRes == 9 {
+					resStr = "Success"
+				}
+			}
+			c.JSON(200, gin.H{
+				"Res": resStr,
+			})
+		})
+	}
 	return r
 }
