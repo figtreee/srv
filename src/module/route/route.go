@@ -47,8 +47,8 @@ func initMySQL(databaseName string) (err error) {
 
 func createHeroTable() {
 	schema := `CREATE TABLE  if not exists hero (
-	id int AUTO_INCREMENT primary key NOT NULL ,
-  name varchar(50) unique NOT NULL)
+	id int AUTO_INCREMENT primary key unique NOT NULL ,
+  name varchar(50) NOT NULL)
 	;`
 	// 调用Exec函数执行sql语句，创建表
 	_, err := db.Exec(schema)
@@ -108,7 +108,7 @@ func getHeroAll() []heroInfo {
 func getHero(heroID int) heroInfo {
 	var res heroInfo
 	getHeroSql := `SELECT id,name FROM hero WHERE id=? `
-	if err := db.Get(&res, getHeroSql, 1); err != nil {
+	if err := db.Get(&res, getHeroSql, heroID); err != nil {
 		var errHero heroInfo
 		return errHero
 	}
@@ -244,12 +244,12 @@ func Init() *gin.Engine {
 			}
 
 			c.JSON(200, gin.H{
-				"Login": resStr,
+				"Register": resStr,
 			})
 		})
 
 		//hero
-		projApiRoute.GET("/hero/get", func(c *gin.Context) {
+		projApiRoute.GET("/hero", func(c *gin.Context) {
 
 			strId := c.DefaultQuery("id", "-1")
 			var resHero heroInfo
@@ -264,7 +264,6 @@ func Init() *gin.Engine {
 		})
 		//
 
-		//有问题
 		projApiRoute.GET("/hero/getall", func(c *gin.Context) {
 			resHero := getHeroAll()
 
@@ -273,9 +272,14 @@ func Init() *gin.Engine {
 			})
 		})
 
-		projApiRoute.GET("/hero/insert", func(c *gin.Context) {
-			newHeroName := c.DefaultQuery("name", "-1")
-			intRes := insertHero(newHeroName)
+		projApiRoute.POST("/hero", func(c *gin.Context) {
+
+			var hero heroInfo
+			if err := c.ShouldBindJSON(&hero); err != nil {
+				log.Printf("Error: %s", err.Error())
+				return
+			}
+			intRes := insertHero(hero.HeroName)
 			var resStr string
 			if intRes != 9 {
 				resStr = "Fail"
@@ -287,7 +291,7 @@ func Init() *gin.Engine {
 			})
 		})
 
-		projApiRoute.GET("/hero/del", func(c *gin.Context) {
+		projApiRoute.DELETE("/hero", func(c *gin.Context) {
 			resStr := "Fail"
 			heroId := c.DefaultQuery("id", "-1")
 			intId, err := strconv.Atoi(heroId)
@@ -302,17 +306,20 @@ func Init() *gin.Engine {
 			})
 		})
 
-		projApiRoute.GET("/hero/update", func(c *gin.Context) {
+		projApiRoute.PUT("/hero", func(c *gin.Context) {
 			resStr := "Fail"
-			heroId := c.DefaultQuery("id", "-1")
-			heroName := c.DefaultQuery("name", "-1")
-			intId, err := strconv.Atoi(heroId)
-			if err == nil {
-				intRes := updateHero(intId, heroName)
-				if intRes == 9 {
-					resStr = "Success"
-				}
+			var hero heroInfo
+			if err := c.ShouldBindJSON(&hero); err != nil {
+				log.Printf("Error: %s", err.Error())
+				return
 			}
+			log.Println("put", hero)
+
+			intRes := updateHero(hero.HeroId, hero.HeroName)
+			if intRes == 9 {
+				resStr = "Success"
+			}
+
 			c.JSON(200, gin.H{
 				"Res": resStr,
 			})
