@@ -1,7 +1,6 @@
 package route
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log"
 	"math/rand"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var db *sqlx.DB
@@ -25,6 +25,26 @@ type heroInfo struct {
 type userInfo struct {
 	UserName string `json:"userName"`
 	UserPwd  string `json:"userPwd"`
+}
+
+func hashAndSalt(pwd []byte) string {
+
+	hash, err := bcrypt.GenerateFromPassword(pwd, bcrypt.MinCost)
+	if err != nil {
+		log.Println(err)
+	}
+	return string(hash)
+}
+
+func comparePasswords(hashedPwd string, plainPwd []byte) bool {
+	byteHash := []byte(hashedPwd)
+	err := bcrypt.CompareHashAndPassword(byteHash, plainPwd)
+	if err != nil {
+		log.Println(err)
+		return false
+	}
+
+	return true
 }
 
 func init() {
@@ -64,7 +84,7 @@ func createUserTable() {
 	schema := `CREATE TABLE  if not exists user (
 	id int AUTO_INCREMENT primary key NOT NULL ,
   name varchar(50) unique NOT NULL,
-  password varchar(20) NOT NULL,
+  password varchar(128) NOT NULL,
 	status varchar(20) NOT NULL DEFAULT 'activation')
 	;`
 	// 调用Exec函数执行sql语句，创建表
@@ -148,12 +168,13 @@ func judgeUser(userName string, userPwd string) (res int) {
 	if total == 0 {
 		return 0
 	}
-	judgePwdSql := `SELECT COUNT(*) FROM user WHERE name=? AND password=?`
-	db.Get(&total, judgePwdSql, userName, userPwd)
-	if total == 0 {
-		return 1
-	} else {
+	judgePwdSql := `SELECT password FROM user WHERE name=?`
+	var strPwd string
+	db.Get(&strPwd, judgePwdSql, userName)
+	if comparePasswords(strPwd, []byte(userPwd)) {
 		return 9
+	} else {
+		return 1
 	}
 }
 
@@ -215,9 +236,9 @@ func Init() *gin.Engine {
 			if ok {
 				ok, _ = regexp.MatchString("^[a-zA-Z0-9]+$", userLogin.UserPwd)
 				if ok {
-					strBytes := []byte(userLogin.UserPwd)
-					enconded := base64.StdEncoding.EncodeToString(strBytes)
-					if res := judgeUser(userLogin.UserName, enconded); res != 9 {
+					//strBytes := []byte(userLogin.UserPwd)
+					//	enconded := base64.StdEncoding.EncodeToString(strBytes)
+					if res := judgeUser(userLogin.UserName, userLogin.UserPwd); res != 9 {
 						if res == 0 {
 							resStr = "Wrong Account"
 						} else {
@@ -260,10 +281,10 @@ func Init() *gin.Engine {
 			if ok {
 				ok, _ = regexp.MatchString("^[a-zA-Z0-9]+$", userLogin.UserPwd)
 				if ok {
-					strBytes := []byte(userLogin.UserPwd)
-					enconded := base64.StdEncoding.EncodeToString(strBytes)
-
-					if res := insertUser(userLogin.UserName, enconded); res != 9 {
+					//	strBytes := []byte(userLogin.UserPwd)
+					//	enconded := base64.StdEncoding.EncodeToString(strBytes)
+					hash := hashAndSalt([]byte(userLogin.UserPwd))
+					if res := insertUser(userLogin.UserName, hash); res != 9 {
 						resStr = "Insert Fail"
 					} else {
 						resStr = "Insert seccess"
