@@ -199,19 +199,21 @@ func Init() *gin.Engine {
 
 	projApiRoute := projRoute.Group("/api")
 	{
-		projApiRoute.GET("/user/login", func(c *gin.Context) {
+		projApiRoute.POST("/user/login", func(c *gin.Context) {
 
 			var resStr string
-			name := c.DefaultQuery("name", "")
-			pwd := c.DefaultQuery("pwd", "")
-			log.Println(name)
-			log.Println(pwd)
-			ok, err := regexp.MatchString("^[a-zA-Z0-9]+$", name)
+			var userLogin userInfo
+			if err := c.ShouldBindJSON(&userLogin); err != nil {
+				log.Printf("Error: %s", err.Error())
+				return
+			}
+
+			ok, err := regexp.MatchString("^[a-zA-Z0-9]+$", userLogin.UserName)
 			log.Println("ok,err", ok, err)
 			if ok {
-				ok, _ = regexp.MatchString("^[a-zA-Z0-9]+$", pwd)
+				ok, _ = regexp.MatchString("^[a-zA-Z0-9]+$", userLogin.UserPwd)
 				if ok {
-					if res := judgeUser(name, pwd); res != 9 {
+					if res := judgeUser(userLogin.UserName, userLogin.UserPwd); res != 9 {
 						if res == 0 {
 							resStr = "Wrong Account"
 						} else {
