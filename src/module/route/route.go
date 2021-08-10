@@ -1,6 +1,7 @@
 package route
 
 import (
+	"encoding/base64"
 	"fmt"
 	"log"
 	"math/rand"
@@ -213,7 +214,9 @@ func Init() *gin.Engine {
 			if ok {
 				ok, _ = regexp.MatchString("^[a-zA-Z0-9]+$", userLogin.UserPwd)
 				if ok {
-					if res := judgeUser(userLogin.UserName, userLogin.UserPwd); res != 9 {
+					strBytes := []byte(userLogin.UserPwd)
+					enconded := base64.StdEncoding.EncodeToString(strBytes)
+					if res := judgeUser(userLogin.UserName, enconded); res != 9 {
 						if res == 0 {
 							resStr = "Wrong Account"
 						} else {
@@ -256,7 +259,10 @@ func Init() *gin.Engine {
 			if ok {
 				ok, _ = regexp.MatchString("^[a-zA-Z0-9]+$", userLogin.UserPwd)
 				if ok {
-					if res := insertUser(userLogin.UserName, userLogin.UserPwd); res != 9 {
+					strBytes := []byte(userLogin.UserPwd)
+					enconded := base64.StdEncoding.EncodeToString(strBytes)
+
+					if res := insertUser(userLogin.UserName, enconded); res != 9 {
 						resStr = "Insert Fail"
 					} else {
 						resStr = "Insert seccess"
