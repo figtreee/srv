@@ -64,7 +64,8 @@ func createUserTable() {
 	schema := `CREATE TABLE  if not exists user (
 	id int AUTO_INCREMENT primary key NOT NULL ,
   name varchar(50) unique NOT NULL,
-  password varchar(20) NOT NULL)
+  password varchar(20) NOT NULL,
+	status varchar(20) NOT NULL DEFAULT 'activation')
 	;`
 	// 调用Exec函数执行sql语句，创建表
 	_, err := db.Exec(schema)
