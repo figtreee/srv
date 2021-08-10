@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"srv/src/module/hero"
 	"strconv"
 	"time"
@@ -200,17 +201,30 @@ func Init() *gin.Engine {
 	{
 		projApiRoute.GET("/user/login", func(c *gin.Context) {
 
+			var resStr string
 			name := c.DefaultQuery("name", "")
 			pwd := c.DefaultQuery("pwd", "")
-			// log.Println(name)
-			// log.Println(pwd)
-			var resStr string
-			if res := judgeUser(name, pwd); res != 9 {
-				if res == 0 {
-					resStr = "Wrong Account"
+			log.Println(name)
+			log.Println(pwd)
+			ok, err := regexp.MatchString("^[a-zA-Z0-9]+$", name)
+			log.Println("ok,err", ok, err)
+			if ok {
+				ok, _ = regexp.MatchString("^[a-zA-Z0-9]+$", pwd)
+				if ok {
+					if res := judgeUser(name, pwd); res != 9 {
+						if res == 0 {
+							resStr = "Wrong Account"
+						} else {
+							resStr = "Wrong Password"
+						}
+					}
 				} else {
-					resStr = "Wrong Password"
+					resStr = "Illegal Password"
 				}
+			} else {
+				resStr = "Illegal Name"
+			}
+			if resStr != "" {
 				log.Println("rseStr", resStr)
 				c.JSON(200, gin.H{
 					"Login": resStr,
@@ -236,11 +250,20 @@ func Init() *gin.Engine {
 				log.Printf("Error: %s", err.Error())
 				return
 			}
-			if res := insertUser(userLogin.UserName, userLogin.UserPwd); res != 9 {
-				resStr = "Insert Fail"
-
+			ok, _ := regexp.MatchString("^[a-zA-Z0-9]+$", userLogin.UserName)
+			if ok {
+				ok, _ = regexp.MatchString("^[a-zA-Z0-9]+$", userLogin.UserPwd)
+				if ok {
+					if res := insertUser(userLogin.UserName, userLogin.UserPwd); res != 9 {
+						resStr = "Insert Fail"
+					} else {
+						resStr = "Insert seccess"
+					}
+				} else {
+					resStr = "Illegal Password"
+				}
 			} else {
-				resStr = "Insert seccess"
+				resStr = "Illegal Name"
 			}
 
 			c.JSON(200, gin.H{
@@ -279,12 +302,18 @@ func Init() *gin.Engine {
 				log.Printf("Error: %s", err.Error())
 				return
 			}
-			intRes := insertHero(hero.HeroName)
 			var resStr string
-			if intRes != 9 {
-				resStr = "Fail"
+			ok, _ := regexp.MatchString("^[a-zA-Z0-9]+$", hero.HeroName)
+			if ok {
+				intRes := insertHero(hero.HeroName)
+
+				if intRes != 9 {
+					resStr = "Fail"
+				} else {
+					resStr = "Success"
+				}
 			} else {
-				resStr = "Success"
+				resStr = "Illegal Name"
 			}
 			c.JSON(200, gin.H{
 				"Res": resStr,
@@ -313,13 +342,16 @@ func Init() *gin.Engine {
 				log.Printf("Error: %s", err.Error())
 				return
 			}
-			log.Println("put", hero)
+			ok, _ := regexp.MatchString("^[a-zA-Z0-9]+$", hero.HeroName)
+			if ok {
 
-			intRes := updateHero(hero.HeroId, hero.HeroName)
-			if intRes == 9 {
-				resStr = "Success"
+				intRes := updateHero(hero.HeroId, hero.HeroName)
+				if intRes == 9 {
+					resStr = "Success"
+				}
+			} else {
+				resStr = "Illegal Name"
 			}
-
 			c.JSON(200, gin.H{
 				"Res": resStr,
 			})
